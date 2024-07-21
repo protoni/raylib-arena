@@ -15,6 +15,11 @@ const float MAP_DEPTH = 100.0f;  // Adjust based on your terrain size
 
 int lastCollidingTriangleIndex = -1;
 
+struct AnimationInfo {
+    ModelAnimation* animation;
+    const char* name;
+};
+
 float clamp(float value, float min, float max) {
     if (value < min) return min;
     if (value > max) return max;
@@ -294,6 +299,15 @@ void PrintMaterialInfo(Model model) {
     }
 }
 
+int FindAnimationByName(const std::vector<AnimationInfo>& animations, const char* name) {
+    for (size_t i = 0; i < animations.size(); i++) {
+        if (strcmp(animations[i].name, name) == 0) {
+            return i;
+        }
+    }
+    return -1; // Animation not found
+}
+
 int main() {
     // Initialization
     const int screenWidth = 800;
@@ -370,16 +384,25 @@ int main() {
     Vector3 playerPosition = { 0.0f, 5.0f, 0.0f };
     Vector3 playerScale = { 0.5f, 0.5f, 0.5f };
 
+    std::vector<AnimationInfo> animations;
     int animCount = 0;
-    ModelAnimation* animations = LoadModelAnimations("../assets/models/orc.glb", &animCount);
-    if (animations == nullptr || animCount == 0) {
+    ModelAnimation* animationData = LoadModelAnimations("../assets/models/orc.glb", &animCount);
+    if (animationData == nullptr || animCount == 0) {
         std::cerr << "Failed to load animations for player model." << std::endl;
         UnloadModel(playerModel);
         UnloadModel(terrainModel);
         CloseWindow();
         return -1;
     }
+    else {
+        for (int i = 0; i < animCount; i++) {
+            animations.push_back({ &animationData[i], animationData[i].name });
+            std::cout << "Loaded animation: " << animationData[i].name << std::endl;
+        }
+    }
 
+    //int currentAnimIndex = FindAnimationByName(animations, "idle");
+    std::string currentAnimName = "idle";
     int currentAnim = 0;
     float animFrameCounter = 0.0f;
     float animSpeed = 50.0f;
@@ -470,7 +493,7 @@ int main() {
 
         // Normalize movement direction
         if (Vector3Length(moveDirection) > 0) {
-            float targetRotation = atan2f(-relativeMove.x, -relativeMove.z);
+            float targetRotation = atan2f(relativeMove.x, relativeMove.z);
             float rotationDiff = targetRotation - playerRotation;
 
             // Normalize the rotation difference to [-PI, PI]
@@ -483,6 +506,17 @@ int main() {
             // Normalize the rotation to [0, 2*PI]
             while (playerRotation < 0) playerRotation += 2 * PI;
             while (playerRotation >= 2 * PI) playerRotation -= 2 * PI;
+        }
+
+        // Change animations
+        if (Vector3Length(moveDirection) > 0 && !isJumping) {
+            currentAnimName = "walk";
+        }
+        else if (isJumping) {
+            currentAnimName = "jump_land";
+        }
+        else {
+            currentAnimName = "idle";
         }
 
         // Apply gravity
@@ -604,11 +638,18 @@ int main() {
         std::cout << "Player position: (" << playerPosition.x << ", " << playerPosition.y << ", " << playerPosition.z << ")" << std::endl;
 
         // Update animation
-        animFrameCounter += deltaTime * animSpeed;
-        UpdateModelAnimation(playerModel, animations[currentAnim], animFrameCounter);
+        int currentAnimIndex = FindAnimationByName(animations, currentAnimName.c_str());
+        if (currentAnimIndex == -1) {
+            std::cerr << "Animation not found!" << std::endl;
+            currentAnimIndex = 0; // Use the first animation as a fallback
+        }
 
-        if (animFrameCounter >= animations[currentAnim].frameCount) {
-            animFrameCounter = 0.0f;
+        animFrameCounter += deltaTime * animSpeed;
+        if (currentAnimIndex >= 0 && currentAnimIndex < animations.size()) {
+            UpdateModelAnimation(playerModel, *animations[currentAnimIndex].animation, animFrameCounter);
+            if (animFrameCounter >= animations[currentAnimIndex].animation->frameCount) {
+                animFrameCounter = 0;
+            }
         }
 
         // Update camera
@@ -749,7 +790,7 @@ int main() {
         DrawText(TextFormat("Jump Timer: %.2f", jumpTimer), 10, 190, 20, DARKGRAY);
         DrawText(TextFormat("Movement: (%.3f, %.3f, %.3f)", movement.x, movement.y, movement.z), 10, 220, 20, DARKGRAY);
         //DrawText(TextFormat("Collision Point: (%.3f, %.3f, %.3f)", newCollisionPoint.x, newCollisionPoint.y, newCollisionPoint.z), 10, 280, 20, DARKGRAY);
-        DrawText(TextFormat("Colliding Triangle: %d", collidingTriangleIndex), 10, 250, 20, BLACK);
+        DrawText(TextFormat("Colliding Triangle: %d", collidingTriangleIndex), 10, 250, 20, DARKGRAY);
         DrawText(TextFormat("Player Velocity: (%.2f, %.2f, %.2f)", playerVelocity.x, playerVelocity.y, playerVelocity.z), 10, 280, 20, DARKGRAY);
         EndDrawing();
     }
@@ -757,10 +798,15 @@ int main() {
     // De-Initialization
     UnloadModel(playerModel); // Unload the player model
     UnloadModel(terrainModel); // Unload the terrain model
-    for (unsigned int i = 0; i < animCount; i++) {
-        UnloadModelAnimation(animations[i]);
+    //for (unsigned int i = 0; i < animCount; i++) {
+    //    UnloadModelAnimation(animationData[i]);
+    //}
+    for (auto& anim : animations) {
+        UnloadModelAnimation(*anim.animation);
     }
-    RL_FREE(animations);
+    animations.clear();
+    RL_FREE(animationData);
+    
     UnloadShader(shader);
     CloseWindow(); // Close window and OpenGL context
 
