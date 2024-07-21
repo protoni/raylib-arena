@@ -1,8 +1,10 @@
 #include "debug.h"
+#include "utils.h"
 #include "logger.h"
+#include <vector>
 
-namespace arena
-{
+namespace arena {
+namespace debug {
 
 #define MAX_MATERIAL_MAPS 100
 
@@ -22,4 +24,19 @@ void PrintMaterialInfo(const Model& model) {
     }
 }
 
+void PrintColliderInfo(const Model& model, const int maxColliderCount) {
+    std::vector<Vector3> colliders =
+        utils::LoadCollidersFromMesh(model.meshes[0]);
+    if (!colliders.empty()) {
+        LOG_DEBUG("Colliders size: ", colliders.size());
+        for (size_t i = 0; i < colliders.size() && i < maxColliderCount;
+             ++i) {
+
+            LOG_DEBUG("Collider ", i, ":  (", colliders[i].x, ", ",
+                      colliders[i].y, ", ", colliders[i].z, ")");
+        }
+    }
+}
+
+}  // namespace debug
 }  // namespace arena

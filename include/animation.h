@@ -18,10 +18,15 @@ class AnimationManager {
     void UpdateAnimation(Model& model, const std::string& animName,
                          float& frameCounter, float deltaTime);
     void Cleanup();
+    int FindAnimationByName(const char* name) const;
+    void SetAnimationByName(const std::string& animation);
 
    private:
-    std::vector<AnimationInfo> animations;
-    int FindAnimationByName(const char* name);
+    
+
+    std::vector<AnimationInfo> m_animations;
+    ModelAnimation* m_animationData;
+    std::string currentAnimName = "idle";
 };
 
 }  // namespace arena

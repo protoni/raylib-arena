@@ -104,7 +104,7 @@ static Vector3 Vector3ClosestPointOnTriangle(const Vector3& point,
         v1, Vector3Add(Vector3Scale(edge0, s), Vector3Scale(edge1, t)));
 }
 
-static std::vector<Vector3> LoadCollidersFromMesh(const Mesh& mesh) {
+std::vector<Vector3> LoadCollidersFromMesh(const Mesh& mesh) {
     std::vector<Vector3> colliders;
 
     if (mesh.vertices != nullptr && mesh.vertexCount > 0 &&
@@ -131,6 +131,62 @@ static std::vector<Vector3> LoadCollidersFromMesh(const Mesh& mesh) {
     }
 
     return colliders;
+}
+
+static bool CheckCollisionPointTriangle(const Vector3& point, const Vector3& v1, const Vector3& v2,
+                                 const Vector3& v3) {
+    // Compute vectors
+    Vector3 u = Vector3Subtract(v2, v1);
+    Vector3 v = Vector3Subtract(v3, v1);
+    Vector3 w = Vector3Subtract(point, v1);
+
+    // Compute dot products
+    float uu = Vector3DotProduct(u, u);
+    float uv = Vector3DotProduct(u, v);
+    float vv = Vector3DotProduct(v, v);
+    float wu = Vector3DotProduct(w, u);
+    float wv = Vector3DotProduct(w, v);
+
+    // Compute barycentric coordinates
+    float denom = uv * uv - uu * vv;
+    float s = (uv * wv - vv * wu) / denom;
+    float t = (uv * wu - uu * wv) / denom;
+
+    // Check if point is in triangle
+    return (s >= 0.0f) && (t >= 0.0f) && (s + t <= 1.0f);
+}
+
+static bool CheckCollisionSphereTriangle(const Vector3& center, const float radius, const Vector3& v1,
+                                  const Vector3& v2, const Vector3& v3,
+                                  float& collisionHeight) {
+    // Check if sphere is above the triangle's bounding box
+    float minX = fmin(fmin(v1.x, v2.x), v3.x);
+    float maxX = fmax(fmax(v1.x, v2.x), v3.x);
+    float minZ = fmin(fmin(v1.z, v2.z), v3.z);
+    float maxZ = fmax(fmax(v1.z, v2.z), v3.z);
+
+    if (center.x < minX - radius || center.x > maxX + radius ||
+        center.z < minZ - radius || center.z > maxZ + radius) {
+        return false;
+    }
+
+    // Calculate the height of the triangle at the sphere's position
+    Vector3 edge1 = Vector3Subtract(v2, v1);
+    Vector3 edge2 = Vector3Subtract(v3, v1);
+    Vector3 normal = Vector3Normalize(Vector3CrossProduct(edge1, edge2));
+
+    float D = -(normal.x * v1.x + normal.y * v1.y + normal.z * v1.z);
+    float triangleHeight =
+        (-normal.x * center.x - normal.z * center.z - D) / normal.y;
+
+    // Check if the sphere is colliding with the triangle
+    if (center.y - radius <= triangleHeight &&
+        center.y + radius >= triangleHeight) {
+        collisionHeight = triangleHeight;
+        return true;
+    }
+
+    return false;
 }
 
 }  // namespace utils

@@ -25,7 +25,6 @@ class Game {
     std::unique_ptr<Player> m_player;
     std::unique_ptr<Terrain> m_terrain;
     std::unique_ptr<Camera> m_camera;
-    std::unique_ptr<AnimationManager> m_animManager;
     std::unique_ptr<ShaderHandler> m_shaderHandler;
     Light m_lights[1] = {0};
 };

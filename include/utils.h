@@ -16,7 +16,18 @@ static Vector3 Vector3ClosestPointOnTriangle(const Vector3& point,
                                              const Vector3& v3);
 
 // Function to load colliders from a mesh
-static std::vector<Vector3> LoadCollidersFromMesh(const Mesh& mesh);
+std::vector<Vector3> LoadCollidersFromMesh(const Mesh& mesh);
+
+// Function to check collision between a point and a triangle
+static bool CheckCollisionPointTriangle(const Vector3& point, const Vector3& v1,
+                                 const Vector3& v2, const Vector3& v3);
+
+// Function to check collision between a sphere and a triange.
+// Return collision height in 'collisionHeight' ref
+static bool CheckCollisionSphereTriangle(const Vector3& center,
+                                         const float radius, const Vector3& v1,
+                                         const Vector3& v2, const Vector3& v3,
+                                         float& collisionHeight);
 
 }  // namespace utils
 }  // namespace arena

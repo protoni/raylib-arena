@@ -3,6 +3,11 @@
 
 namespace arena {
 
+ShaderHandler::ShaderHandler(Camera* camera) : m_camera(camera) {}
+
+ShaderHandler::~ShaderHandler() {
+    UnloadShader(m_shader);
+}
 
 bool ShaderHandler::Load(const char* vertexShaderPath,
                          const char* fragmentShaderPath) {
@@ -12,12 +17,7 @@ bool ShaderHandler::Load(const char* vertexShaderPath,
 
     // Check if shader loaded successfully
     if (!IsShaderReady(shader)) {
-        const char* error = GetShaderLoaderLog();
-        if (error != nullptr && strlen(error) > 0) {
-            LOG_ERROR("Failed to load shader. Error: ", error);
-        } else {
-            LOG_ERROR("Failed to load shader. Unknown error.");
-        }
+        LOG_ERROR("Failed to load shader");
         return false;
     }
 
@@ -49,6 +49,13 @@ bool ShaderHandler::Load(const char* vertexShaderPath,
 void ShaderHandler::Begin() {}
 
 void ShaderHandler::End() {}
+
+void ShaderHandler::Update() {
+    Vector3 pos = m_camera->GetPosition();
+    float cameraPos[3] = {pos.x, pos.y, pos.z};
+    SetShaderValue(m_shader, m_shader.locs[SHADER_LOC_VECTOR_VIEW], cameraPos,
+                   SHADER_UNIFORM_VEC3);
+}
 
 void ShaderHandler::SetCameraPosition(const Vector3& position) {}
 

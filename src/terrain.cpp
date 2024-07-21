@@ -1,22 +1,35 @@
 #include "terrain.h"
-#include "iostream"
 #include "utils.h"
+#include "logger.h"
+#include "debug.h"
+
 
 namespace arena {
 
 Terrain::Terrain(const char* modelPath) : m_modelPath(modelPath) {}
 
+Terrain::~Terrain() {
+    UnloadModel(m_model);
+}
+
 bool Terrain::Initialize() {
-    return LoadTerrainModel(m_modelPath);
+    if (!LoadTerrainModel(m_modelPath))
+        return false;
+
+    m_colliders = utils::LoadCollidersFromMesh(m_model.meshes[0]);
+
+    return true;
 }
 
 bool Terrain::LoadTerrainModel(const char* modelPath) {
-    Model terrainModel = LoadModel("../assets/models/map.glb");
-    if (terrainModel.meshCount == 0) {
-        std::cerr << "Failed to load terrain model." << std::endl;
-        CloseWindow();
+    m_model = LoadModel(modelPath);
+    if (m_model.meshCount == 0) {
+        LOG_ERROR("Failed to load terrain model.");
         return false;
     }
+
+    LOG_INFO("Successfully loaded terrain model");
+    debug::PrintMaterialInfo(m_model);
 
     return true;
 }
@@ -25,11 +38,11 @@ void Terrain::Draw() {
     // Draw terrain model and debug colliders
 }
 
-std::pair<float, int> Terrain::CheckCollision(Vector3 position, float radius,
-                                              float height) {
-    if (colliders.size() % 3 != 0) {
-        std::cerr << "Collider vector size is not a multiple of 3. Size: "
-                  << colliders.size() << std::endl;
+std::pair<float, int> Terrain::CheckCollision(const Vector3& position,
+                                              const float radius,
+                                              const float height) {
+    if (m_colliders.size() % 3 != 0) {
+        LOG_DEBUG("Collider vector size is not a multiple of 3. Size: ", m_colliders.size());
         return std::make_pair(-FLT_MAX, -1);
     }
 
@@ -39,9 +52,9 @@ std::pair<float, int> Terrain::CheckCollision(Vector3 position, float radius,
     float lowestGroundHeight = FLT_MAX;
 
     auto checkTriangle = [&](int index) {
-        Vector3 v1 = colliders[index];
-        Vector3 v2 = colliders[index + 1];
-        Vector3 v3 = colliders[index + 2];
+        Vector3 v1 = m_colliders[index];
+        Vector3 v2 = m_colliders[index + 1];
+        Vector3 v3 = m_colliders[index + 2];
 
         // Project the position onto the triangle's plane
         Vector3 normal = Vector3Normalize(Vector3CrossProduct(
@@ -76,14 +89,14 @@ std::pair<float, int> Terrain::CheckCollision(Vector3 position, float radius,
 
     // First, check the last colliding triangle
     if (m_lastCollidingTriangleIndex != -1 &&
-        m_lastCollidingTriangleIndex * 3 + 2 < colliders.size()) {
+        m_lastCollidingTriangleIndex * 3 + 2 < m_colliders.size()) {
         if (checkTriangle(m_lastCollidingTriangleIndex * 3)) {
             return std::make_pair(highestPoint, collidingTriangleIndex);
         }
     }
 
     // If not colliding with the last triangle, check all others
-    for (size_t i = 0; i < colliders.size(); i += 3) {
+    for (size_t i = 0; i < m_colliders.size(); i += 3) {
         checkTriangle(i);
     }
 
