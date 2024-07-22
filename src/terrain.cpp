@@ -54,6 +54,20 @@ void Terrain::DrawCollidingTriangle(const int triangleIndex,
     }
 }
 
+bool Terrain::IsPointInsideTriangle(const Vector3& point,
+                                    int triangleIndex) const {
+    if (triangleIndex < 0 || triangleIndex * 3 + 2 >= m_colliders.size()) {
+        return false;
+    }
+
+    Vector3 v1 = m_colliders[triangleIndex * 3];
+    Vector3 v2 = m_colliders[triangleIndex * 3 + 1];
+    Vector3 v3 = m_colliders[triangleIndex * 3 + 2];
+
+    Vector3 barycentric = utils::BarycentricCoordinates(point, v1, v2, v3);
+    return barycentric.x >= 0 && barycentric.y >= 0 && barycentric.z >= 0;
+}
+
 void Terrain::DrawColliderFaces() const {
     for (size_t i = 0; i < m_colliders.size(); i += 3) {
         DrawTriangle3D(m_colliders[i], m_colliders[i + 1], m_colliders[i + 2],
@@ -69,6 +83,21 @@ void Terrain::DrawColliderEdges() const {
     }
 }
 
+Vector3 Terrain::GetTriangleNormal(const int triangleIndex) const {
+    if (triangleIndex < 0 || triangleIndex * 3 + 2 >= m_colliders.size()) {
+        return Vector3{0, 1, 0};  // Default to upward normal if invalid index
+    }
+
+    Vector3 v1 = m_colliders[triangleIndex * 3];
+    Vector3 v2 = m_colliders[triangleIndex * 3 + 1];
+    Vector3 v3 = m_colliders[triangleIndex * 3 + 2];
+
+    Vector3 edge1 = Vector3Subtract(v2, v1);
+    Vector3 edge2 = Vector3Subtract(v3, v1);
+    Vector3 normal = Vector3CrossProduct(edge1, edge2);
+    return Vector3Normalize(normal);
+}
+
 std::pair<float, int> Terrain::CheckCollision(
     const Vector3& position, const float radius, const float height,
     int& outLastCollidingTriangleIndex) {
@@ -77,7 +106,6 @@ std::pair<float, int> Terrain::CheckCollision(
                   m_colliders.size());
         return std::make_pair(-FLT_MAX, -1);
     }
-
     float highestPoint = -FLT_MAX;
     int collidingTriangleIndex = -1;
     float lowestGroundHeight = FLT_MAX;
@@ -87,35 +115,34 @@ std::pair<float, int> Terrain::CheckCollision(
         Vector3 v2 = m_colliders[index + 1];
         Vector3 v3 = m_colliders[index + 2];
 
-        // Project the position onto the triangle's plane
         Vector3 normal = Vector3Normalize(Vector3CrossProduct(
             Vector3Subtract(v2, v1), Vector3Subtract(v3, v1)));
+
         float d = -Vector3DotProduct(normal, v1);
         float t = -(Vector3DotProduct(normal, position) + d) /
                   Vector3DotProduct(normal, normal);
         Vector3 projection = Vector3Add(position, Vector3Scale(normal, t));
 
-        // Check if the projection is inside the triangle using barycentric coordinates
         Vector3 barycentric =
             utils::BarycentricCoordinates(projection, v1, v2, v3);
+
         if (barycentric.x >= 0 && barycentric.y >= 0 && barycentric.z >= 0) {
             float triangleHeight = projection.y;
             float feetHeight = position.y - height / 2;
+            float headHeight = position.y + height / 2;
+
             if (feetHeight <= triangleHeight + m_settings.collisionHysteresis &&
-                position.y + height / 2 >=
-                    triangleHeight - m_settings.collisionHysteresis &&
-                triangleHeight > highestPoint) {
-                highestPoint = triangleHeight;
-                collidingTriangleIndex = index / 3;
-
-                if (triangleHeight < lowestGroundHeight) {
-                    lowestGroundHeight = triangleHeight;
+                headHeight >= triangleHeight - m_settings.collisionHysteresis) {
+                if (triangleHeight > highestPoint) {
+                    highestPoint = triangleHeight;
+                    collidingTriangleIndex = index / 3;
+                    if (triangleHeight < lowestGroundHeight) {
+                        lowestGroundHeight = triangleHeight;
+                    }
+                    return true;
                 }
-
-                return true;
             }
         }
-
         return false;
     };
 

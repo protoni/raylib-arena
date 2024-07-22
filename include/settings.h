@@ -8,8 +8,8 @@
 namespace arena {
 
 struct WindowSettings {
-    const int screenWidth = 800;
-    const int screenHeight = 600;
+    const int screenWidth = 1280;
+    const int screenHeight = 720;
     const std::string screenName = "Raylib Arena";
 };
 

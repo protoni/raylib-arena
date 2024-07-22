@@ -1,12 +1,11 @@
 #ifndef TERRAIN_H
 #define TERRAIN_H
 
-#include "settings.h"
 #include <vector>
 #include "raylib.h"
+#include "settings.h"
 
 namespace arena {
-
 
 class Terrain {
    public:
@@ -18,12 +17,13 @@ class Terrain {
                                const Vector3& colliderPosition);
     void DrawColliderFaces() const;
     void DrawColliderEdges() const;
-    std::pair<float, int> CheckCollision(const Vector3& position, const float radius,
-                                         const float height,
+    std::pair<float, int> CheckCollision(const Vector3& position,
+                                         const float radius, const float height,
                                          int& outLastCollidingTriangleIndex);
     bool Initialize();
     const std::vector<Vector3>& GetColliders() const { return m_colliders; }
-    
+    bool IsPointInsideTriangle(const Vector3& point, int triangleIndex) const;
+    Vector3 GetTriangleNormal(const int triangleIndex) const;
 
    private:
     TerrainSettings m_settings;
