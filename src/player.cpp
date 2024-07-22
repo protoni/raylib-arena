@@ -155,7 +155,9 @@ void Player::Update(float deltaTime, const std::vector<Vector3>& colliders) {
     updateAnimations(moveDirection);
 
     // Apply gravity
-    if (!m_state.isGrounded) {
+    const float coyoteTime =
+        0.1f;  // Adjust this value to change the "coyote time" duration
+    if (m_state.timeSinceGrounded > coyoteTime) {
         const float maxFallSpeed = -20.0f;
         m_state.velocity.y += m_appSettings.physicsSettings.gravity * deltaTime;
         m_state.velocity.y = std::max(m_state.velocity.y, maxFallSpeed);
@@ -170,10 +172,11 @@ void Player::Update(float deltaTime, const std::vector<Vector3>& colliders) {
     m_state.position = newPosition;
 
     // Handle jumping
-    if (IsKeyPressed(KEY_SPACE) && m_state.isGrounded) {
+    if (IsKeyPressed(KEY_SPACE) && m_state.timeSinceGrounded <= coyoteTime) {
         m_state.velocity.y = m_state.jumpSpeed;
         m_state.isJumping = true;
         m_state.isGrounded = false;
+        m_state.timeSinceGrounded = coyoteTime + 0.1f;  // Prevent double jumps
     }
 
     // Apply movement
@@ -278,47 +281,67 @@ void Player::checkCollisions(Vector3& newPosition) {
     m_state.groundHeight = collisionResult.first;
     m_state.collidingTriangleIndex = collisionResult.second;
 
+    LOG_DEBUG("Ground height: ", m_state.groundHeight);
+    LOG_DEBUG("Colliding triangle index: ", m_state.collidingTriangleIndex);
+
     if (m_state.collidingTriangleIndex != -1) {
-        Vector3 normal =
-            m_terrain->GetTriangleNormal(m_state.collidingTriangleIndex);
-        float slope = Vector3DotProduct(normal, Vector3{0, 1, 0});
+        std::vector<int> nearbyTriangles =
+            m_terrain->GetNearbyTriangles(newPosition, m_state.radius * 2);
+        Vector3 averageNormal = Vector3Zero();
+
+        if (!nearbyTriangles.empty()) {
+            for (int triangleIndex : nearbyTriangles) {
+                averageNormal = Vector3Add(
+                    averageNormal, m_terrain->GetTriangleNormal(triangleIndex));
+            }
+            averageNormal =
+                Vector3Scale(averageNormal, 1.0f / nearbyTriangles.size());
+            averageNormal = Vector3Normalize(averageNormal);
+        } else {
+            averageNormal = Vector3{
+                0, 1, 0};  // Default to upward normal if no nearby triangles
+        }
+
+        float slope = Vector3DotProduct(averageNormal, Vector3{0, 1, 0});
         float maxClimbableSlope = cosf(DEG2RAD * 45.0f);  // 45 degree max slope
 
         float feetHeight = newPosition.y - m_state.height / 2;
         float distanceToGround = feetHeight - m_state.groundHeight;
 
-        if (distanceToGround <= 0.1f ||
-            (m_state.velocity.y <= 0 &&
-             distanceToGround <= m_state.height / 2)) {
+        LOG_DEBUG("Average normal: (", averageNormal.x, ", ", averageNormal.y,
+                  ", ", averageNormal.z, ")");
+        LOG_DEBUG("Slope: ", slope);
+        LOG_DEBUG("Distance to ground: ", distanceToGround);
+
+        const float stepUpHeight = 0.3f;
+        const float groundedTolerance = 0.1f;
+
+        if (distanceToGround <= stepUpHeight) {
             if (slope > maxClimbableSlope) {
-                // Climbable slope
                 newPosition.y = m_state.groundHeight + m_state.height / 2;
                 if (m_state.velocity.y < 0)
                     m_state.velocity.y = 0;
                 m_state.isGrounded = true;
                 m_state.isJumping = false;
+                m_state.timeSinceGrounded = 0;
             } else {
-                // Too steep, slide down
-                Vector3 slopeDirection =
-                    Vector3Normalize(Vector3{normal.x, 0, normal.z});
+                Vector3 slopeDirection = Vector3Normalize(
+                    Vector3{averageNormal.x, 0, averageNormal.z});
                 float slideSpeed =
                     Vector3Length(m_state.velocity) * (1.0f - slope);
 
-                // Project current velocity onto the slope
                 Vector3 projectedVelocity = Vector3Subtract(
                     m_state.velocity,
-                    Vector3Scale(normal,
-                                 Vector3DotProduct(m_state.velocity, normal)));
+                    Vector3Scale(
+                        averageNormal,
+                        Vector3DotProduct(m_state.velocity, averageNormal)));
 
-                // Combine slide and current velocity
                 m_state.velocity =
                     Vector3Add(Vector3Scale(slopeDirection, slideSpeed),
                                Vector3Scale(projectedVelocity, slope));
 
-                // Ensure the player stays close to the slope surface
-                newPosition.y =
-                    m_state.groundHeight + m_state.height / 2 + 0.1f;
-
+                newPosition.y = m_state.groundHeight + m_state.height / 2 +
+                                groundedTolerance;
                 m_state.isGrounded = false;
             }
         } else {
@@ -328,7 +351,19 @@ void Player::checkCollisions(Vector3& newPosition) {
         m_state.isGrounded = false;
     }
 
+    if (!m_state.isGrounded) {
+        m_state.timeSinceGrounded += GetFrameTime();
+    } else {
+        m_state.timeSinceGrounded = 0;
+    }
+
     m_state.lastCollidingTriangleIndex = m_state.collidingTriangleIndex;
+
+    LOG_DEBUG("Final position: (", newPosition.x, ", ", newPosition.y, ", ",
+              newPosition.z, ")");
+    LOG_DEBUG("Final velocity: (", m_state.velocity.x, ", ", m_state.velocity.y,
+              ", ", m_state.velocity.z, ")");
+    LOG_DEBUG("Is grounded: ", m_state.isGrounded);
 }
 
 }  // namespace arena

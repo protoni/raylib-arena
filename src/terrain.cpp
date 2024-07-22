@@ -21,6 +21,21 @@ bool Terrain::Initialize() {
     return true;
 }
 
+std::vector<int> Terrain::GetNearbyTriangles(const Vector3& position,
+                                             float radius) const {
+    std::vector<int> nearbyTriangles;
+    for (size_t i = 0; i < m_colliders.size(); i += 3) {
+        Vector3 triangleCenter = Vector3Scale(
+            Vector3Add(Vector3Add(m_colliders[i], m_colliders[i + 1]),
+                       m_colliders[i + 2]),
+            1.0f / 3.0f);
+        if (Vector3Distance(position, triangleCenter) <= radius) {
+            nearbyTriangles.push_back(i / 3);
+        }
+    }
+    return nearbyTriangles;
+}
+
 bool Terrain::LoadTerrainModel(const char* modelPath) {
     m_model = LoadModel(modelPath);
     if (m_model.meshCount == 0) {
@@ -52,20 +67,6 @@ void Terrain::DrawCollidingTriangle(const int triangleIndex,
         DrawTriangle3D(v1, v2, v3, RED);
         DrawSphere(colliderPosition, 0.1f, GRAY);
     }
-}
-
-bool Terrain::IsPointInsideTriangle(const Vector3& point,
-                                    int triangleIndex) const {
-    if (triangleIndex < 0 || triangleIndex * 3 + 2 >= m_colliders.size()) {
-        return false;
-    }
-
-    Vector3 v1 = m_colliders[triangleIndex * 3];
-    Vector3 v2 = m_colliders[triangleIndex * 3 + 1];
-    Vector3 v3 = m_colliders[triangleIndex * 3 + 2];
-
-    Vector3 barycentric = utils::BarycentricCoordinates(point, v1, v2, v3);
-    return barycentric.x >= 0 && barycentric.y >= 0 && barycentric.z >= 0;
 }
 
 void Terrain::DrawColliderFaces() const {

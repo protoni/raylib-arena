@@ -22,8 +22,9 @@ class Terrain {
                                          int& outLastCollidingTriangleIndex);
     bool Initialize();
     const std::vector<Vector3>& GetColliders() const { return m_colliders; }
-    bool IsPointInsideTriangle(const Vector3& point, int triangleIndex) const;
     Vector3 GetTriangleNormal(const int triangleIndex) const;
+    std::vector<int> GetNearbyTriangles(const Vector3& position,
+                                        float radius) const;
 
    private:
     TerrainSettings m_settings;

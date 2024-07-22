@@ -28,6 +28,7 @@ struct PlayerState {
     float groundHeight = 0;
     int lastCollidingTriangleIndex = -1;
     int collidingTriangleIndex = -1;
+    float timeSinceGrounded = 0.0f;
 
     PlayerState(const Vector3& pos, const Vector3& facing, const float rotation,
                 const float rad, const float inHeight, const float inMoveSpeed,
