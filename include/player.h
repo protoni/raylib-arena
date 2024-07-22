@@ -57,7 +57,7 @@ class Player {
 
    private:
     void checkCollisions(Vector3& newPosition);
-    void updateAnimations(const Vector3& direction) const;
+    void updateAnimations(const Vector3& direction, const float deltaTime);
     void calculateFacingDirection(const float delta);
 
     // Apply movement vector to direction. Returns the relative move.

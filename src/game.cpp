@@ -53,20 +53,12 @@ void Game::Update() {
                      m_player->GetState().facingDirection, deltaTime);
 
     UpdateLightValues(m_shaderHandler->GetShader(), m_lights[0]);
-
-    LOG_DEBUG("Camera position: ");
-    debug::PrintVec3(m_camera->GetCamera().position);
-    LOG_DEBUG("Camera target: ");
-    debug::PrintVec3(m_camera->GetCamera().target);
 }
 
 void Game::Draw() {
     BeginDrawing();
     ClearBackground(RAYWHITE);
     BeginMode3D(m_camera->GetCamera());
-
-    m_terrain->Draw();
-    m_player->Draw();
 
     m_shaderHandler->Update();
     m_shaderHandler->Begin();

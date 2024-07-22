@@ -86,11 +86,6 @@ void ShaderHandler::Update() {
     Color diffuseColor = WHITE;
     SetShaderValue(m_shader, m_shader.locs[SHADER_LOC_COLOR_DIFFUSE],
                    &diffuseColor, SHADER_UNIFORM_VEC4);
-
-    LOG_DEBUG(
-        "Shader MVP Matrix: %s",
-        TextFormat("%.2f %.2f %.2f %.2f", viewProjection.m0, viewProjection.m1,
-                   viewProjection.m2, viewProjection.m3));
 }
 
 void ShaderHandler::SetCameraPosition(const Vector3& position) {}

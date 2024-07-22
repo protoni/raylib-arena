@@ -32,14 +32,25 @@ bool Player::LoadPlayerModel(const char* modelPath) {
     return true;
 }
 
-void Player::updateAnimations(const Vector3& direction) const {
-    if (m_state.isJumping || !m_state.isGrounded) {
-        m_animManager->SetAnimationByName("jump_land");
-    } else if (Vector3Length(direction) > 0) {
-        m_animManager->SetAnimationByName("walk");
+void Player::updateAnimations(const Vector3& direction, const float deltaTime) {
+    const float blendTime = 0.3f;
+
+    //LOG_DEBUG("Player state - isJumping: ", m_state.isJumping,
+    //          ", isGrounded: ", m_state.isGrounded);
+    //LOG_DEBUG("Movement direction: (", direction.x, ", ", direction.y, ", ",
+    //          direction.z, ")");
+
+    if (m_state.isJumping) {
+        m_animManager->BlendToAnimation("jump_start", blendTime);
+    } else if (!m_state.isGrounded) {
+        m_animManager->BlendToAnimation("jump_idle", blendTime);
+    } else if (Vector3Length(direction) > 0.1f) {
+        m_animManager->BlendToAnimation("walk", blendTime);
     } else {
-        m_animManager->SetAnimationByName("idle");
+        m_animManager->BlendToAnimation("idle", blendTime);
     }
+
+    m_animManager->UpdateAnimation(m_model, deltaTime);
 }
 
 void Player::calculateFacingDirection(const float delta) {
@@ -152,7 +163,7 @@ void Player::Update(float deltaTime, const std::vector<Vector3>& colliders) {
     updateVelocity(deltaTime, relativeMove);
 
     // Change animations
-    updateAnimations(moveDirection);
+    updateAnimations(moveDirection, deltaTime);
 
     // Apply gravity
     const float coyoteTime =
@@ -219,10 +230,21 @@ void Player::Update(float deltaTime, const std::vector<Vector3>& colliders) {
     debug::PrintVec3(m_state.position);
 
     // Update animations
-    m_animManager->UpdateAnimation(m_model, deltaTime);
+    //m_animManager->UpdateAnimation(m_model, deltaTime);
 }
 
 void Player::Draw() const {
+
+    //UpdateModelAnimation(m_model, *m_animManager->GetCurrentAnimation(),
+    //                     m_animManager->GetCurrentFrame());
+
+    LOG_DEBUG("Drawing player. Current animation: ",
+              m_animManager->GetCurrentAnimationName());
+
+    m_animManager->ApplyAnimationPose(m_model);
+
+    UpdateModelAnimation(m_model, *m_animManager->GetCurrentAnimation(),
+                         m_animManager->GetCurrentFrame());
 
     // Draw player model
     Vector3 modelPosition = {
@@ -264,12 +286,21 @@ bool Player::Initialize() {
     if (!LoadPlayerModel(m_settings.model))
         return false;
 
+    if (m_model.boneCount == 0) {
+        LOG_ERROR("Model has no bones. Animation will not work.");
+        return false;
+    }
+
     // Load animations
     m_animManager = std::make_unique<AnimationManager>(m_settings);
     if (!m_animManager->LoadAnimations(m_settings.model)) {
         LOG_ERROR("Failed to load animations");
         return false;
     }
+
+    // Set initial animation to idle
+    m_animManager->BlendToAnimation("idle", 0.0f);
+    m_animManager->UpdateAnimation(m_model, 0.0f);
 
     return true;
 }
