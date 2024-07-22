@@ -1,9 +1,9 @@
 #ifndef SETTINGS_H
 #define SETTINGS_H
 
+#include <string>
 #include "raylib.h"
 #include "raymath.h"
-#include <string>
 
 namespace arena {
 
@@ -37,8 +37,8 @@ struct PlayerSettings {
 
 struct TerrainSettings {
     const char* model = "../assets/models/map.glb";
-    const float mapWidth = 100.0f;
-    const float mapDepth = 100.0f;
+    const float mapWidth = 200.0f;
+    const float mapDepth = 200.0f;
     const float collisionHysteresis = 0.05f;
 };
 

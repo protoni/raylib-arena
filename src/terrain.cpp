@@ -1,12 +1,12 @@
 #include "terrain.h"
-#include "utils.h"
-#include "logger.h"
 #include "debug.h"
-
+#include "logger.h"
+#include "utils.h"
 
 namespace arena {
 
-Terrain::Terrain(const TerrainSettings& settings) : m_modelPath(settings.model) {}
+Terrain::Terrain(const TerrainSettings& settings)
+    : m_modelPath(settings.model) {}
 
 Terrain::~Terrain() {
     UnloadModel(m_model);
@@ -29,6 +29,8 @@ bool Terrain::LoadTerrainModel(const char* modelPath) {
     }
 
     LOG_INFO("Successfully loaded terrain model");
+    LOG_INFO("Model info: Meshes: ", m_model.meshCount,
+             ", Materials: ", m_model.materialCount);
     debug::PrintMaterialInfo(m_model);
 
     return true;
@@ -36,8 +38,8 @@ bool Terrain::LoadTerrainModel(const char* modelPath) {
 
 void Terrain::Draw() {
     // Draw terrain model and debug colliders
-    DrawModelEx(m_model, Vector3Zero(), Vector3{1, 0, 0}, 0.0f,
-                Vector3One(), WHITE);
+    DrawModelEx(m_model, Vector3Zero(), Vector3{1, 0, 0}, 0.0f, Vector3One(),
+                WHITE);
 }
 
 void Terrain::DrawCollidingTriangle(const int triangleIndex,
@@ -54,7 +56,8 @@ void Terrain::DrawCollidingTriangle(const int triangleIndex,
 
 void Terrain::DrawColliderFaces() const {
     for (size_t i = 0; i < m_colliders.size(); i += 3) {
-        DrawTriangle3D(m_colliders[i], m_colliders[i + 1], m_colliders[i + 2], RED);
+        DrawTriangle3D(m_colliders[i], m_colliders[i + 1], m_colliders[i + 2],
+                       RED);
     }
 }
 
@@ -66,12 +69,12 @@ void Terrain::DrawColliderEdges() const {
     }
 }
 
-std::pair<float, int> Terrain::CheckCollision(const Vector3& position,
-                                              const float radius,
-                                              const float height,
-                                              int& outLastCollidingTriangleIndex) {
+std::pair<float, int> Terrain::CheckCollision(
+    const Vector3& position, const float radius, const float height,
+    int& outLastCollidingTriangleIndex) {
     if (m_colliders.size() % 3 != 0) {
-        LOG_DEBUG("Collider vector size is not a multiple of 3. Size: ", m_colliders.size());
+        LOG_DEBUG("Collider vector size is not a multiple of 3. Size: ",
+                  m_colliders.size());
         return std::make_pair(-FLT_MAX, -1);
     }
 
@@ -93,7 +96,8 @@ std::pair<float, int> Terrain::CheckCollision(const Vector3& position,
         Vector3 projection = Vector3Add(position, Vector3Scale(normal, t));
 
         // Check if the projection is inside the triangle using barycentric coordinates
-        Vector3 barycentric = utils::BarycentricCoordinates(projection, v1, v2, v3);
+        Vector3 barycentric =
+            utils::BarycentricCoordinates(projection, v1, v2, v3);
         if (barycentric.x >= 0 && barycentric.y >= 0 && barycentric.z >= 0) {
             float triangleHeight = projection.y;
             float feetHeight = position.y - height / 2;

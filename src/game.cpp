@@ -1,4 +1,5 @@
 #include "game.h"
+#include "debug.h"
 #include "logger.h"
 #include "raylib.h"
 #define RLIGHTS_IMPLEMENTATION
@@ -7,7 +8,6 @@
 namespace arena {
 
 bool Game::Initialize() {
-    Logger::Init(LogLevel::DEBUG, "ArenaGame.log");
 
     // Create a camera
     m_camera = std::make_unique<Camera>(m_settings.cameraSettings);
@@ -49,9 +49,15 @@ void Game::Update() {
     m_shaderHandler->Update();
 
     m_player->Update(deltaTime, m_terrain->GetColliders());
-    m_camera->Update(m_player->position, m_player->facing, deltaTime);
+    m_camera->Update(m_player->GetState().position,
+                     m_player->GetState().facingDirection, deltaTime);
 
     UpdateLightValues(m_shaderHandler->GetShader(), m_lights[0]);
+
+    LOG_DEBUG("Camera position: ");
+    debug::PrintVec3(m_camera->GetCamera().position);
+    LOG_DEBUG("Camera target: ");
+    debug::PrintVec3(m_camera->GetCamera().target);
 }
 
 void Game::Draw() {
@@ -59,6 +65,10 @@ void Game::Draw() {
     ClearBackground(RAYWHITE);
     BeginMode3D(m_camera->GetCamera());
 
+    m_terrain->Draw();
+    m_player->Draw();
+
+    m_shaderHandler->Update();
     m_shaderHandler->Begin();
 
     m_terrain->Draw();

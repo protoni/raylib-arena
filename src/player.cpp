@@ -33,11 +33,10 @@ bool Player::LoadPlayerModel(const char* modelPath) {
 }
 
 void Player::updateAnimations(const Vector3& direction) const {
-    // Change animations
-    if (Vector3Length(direction) > 0 && !m_state.isJumping) {
-        m_animManager->SetAnimationByName("walk");
-    } else if (m_state.isJumping) {
+    if (m_state.isJumping || !m_state.isGrounded) {
         m_animManager->SetAnimationByName("jump_land");
+    } else if (Vector3Length(direction) > 0) {
+        m_animManager->SetAnimationByName("walk");
     } else {
         m_animManager->SetAnimationByName("idle");
     }
@@ -88,22 +87,37 @@ Vector3 Player::moveToFacingDirection(const float delta,
 }
 
 void Player::updateVelocity(const float delta, const Vector3& relativeMove) {
-    // Update velocity based on input
+    float airControl = m_appSettings.physicsSettings.airControl;
+    float airFriction = m_appSettings.physicsSettings.airFriction;
+
     if (m_state.isGrounded) {
+        // On ground, directly set velocity based on input
         m_state.velocity.x = relativeMove.x * m_state.moveSpeed;
         m_state.velocity.z = relativeMove.z * m_state.moveSpeed;
     } else {
-        // In air, apply reduced control
-        float airControl = m_appSettings.physicsSettings.airControl;
-        float airFriction = m_appSettings.physicsSettings.airFriction;
-        m_state.velocity.x +=
-            relativeMove.x * m_state.moveSpeed * airControl * delta;
-        m_state.velocity.z +=
-            relativeMove.z * m_state.moveSpeed * airFriction * delta;
+        // In air, apply reduced control and maintain momentum
+        if (Vector3Length(relativeMove) > 0) {
+            // Apply air control when there's input
+            m_state.velocity.x +=
+                relativeMove.x * m_state.moveSpeed * airControl * delta;
+            m_state.velocity.z +=
+                relativeMove.z * m_state.moveSpeed * airControl * delta;
+        }
 
-        // Apply air friction
-        m_state.velocity.x *= airControl;
-        m_state.velocity.z *= airFriction;
+        // Apply air friction regardless of input
+        m_state.velocity.x *= powf(airFriction, delta);
+        m_state.velocity.z *= powf(airFriction, delta);
+    }
+
+    // Optionally, cap the horizontal velocity to prevent excessive speeds
+    float maxHorizontalSpeed =
+        m_state.moveSpeed * 1.5f;  // Adjust this multiplier as needed
+    float horizontalSpeed = sqrtf(m_state.velocity.x * m_state.velocity.x +
+                                  m_state.velocity.z * m_state.velocity.z);
+    if (horizontalSpeed > maxHorizontalSpeed) {
+        float scale = maxHorizontalSpeed / horizontalSpeed;
+        m_state.velocity.x *= scale;
+        m_state.velocity.z *= scale;
     }
 }
 
@@ -135,7 +149,10 @@ void Player::Update(float deltaTime, const std::vector<Vector3>& colliders) {
 
     // Apply gravity
     if (!m_state.isGrounded) {
+        const float maxFallSpeed =
+            -20.0f;  // Apply gravity with a maximum fall speed
         m_state.velocity.y += m_appSettings.physicsSettings.gravity * deltaTime;
+        m_state.velocity.y = std::max(m_state.velocity.y, maxFallSpeed);
     }
 
     // Calculate new position
@@ -156,7 +173,7 @@ void Player::Update(float deltaTime, const std::vector<Vector3>& colliders) {
     m_state.movement = Vector3Subtract(newPosition, m_state.position);
     if (Vector3Length(m_state.movement) > m_settings.movementThreshold) {
         m_state.position = newPosition;
-    } else if (isGrounded) {
+    } else if (m_state.isGrounded) {
         // If grounded and movement is small, just update Y
         m_state.position.y = newPosition.y;
     }
@@ -248,31 +265,45 @@ bool Player::Initialize() {
 }
 
 void Player::checkCollisions(Vector3& newPosition) {
-
     std::pair<float, int> collisionResult =
         m_terrain->CheckCollision(newPosition, m_state.radius, m_state.height,
                                   m_state.lastCollidingTriangleIndex);
     m_state.groundHeight = collisionResult.first;
     m_state.collidingTriangleIndex = collisionResult.second;
 
-    //bool wasGrounded = isGrounded;
-    //m_isGrounded = false;
+    float feetHeight = newPosition.y - m_state.height / 2;
+    float distanceToGround = feetHeight - m_state.groundHeight;
+
+    const float maxSnapDistance = 0.1f;  // Adjust this value as needed
 
     if (m_state.collidingTriangleIndex != -1) {
-        float feetHeight = newPosition.y - m_state.height / 2;
-        if (feetHeight <=
-            m_state.groundHeight +
-                m_appSettings.physicsSettings.collisionGroundCheckDistance) {
+        if (distanceToGround <= maxSnapDistance && m_state.velocity.y <= 0) {
+            newPosition.y = m_state.groundHeight + m_state.height / 2;
+            m_state.velocity.y = 0;
+            m_state.isGrounded = true;
+            m_state.isJumping = false;
+        } else if (distanceToGround < 0) {
+            // We're inside the ground, push the player out
             newPosition.y = m_state.groundHeight + m_state.height / 2;
             if (m_state.velocity.y < 0) {
                 m_state.velocity.y = 0;
             }
             m_state.isGrounded = true;
             m_state.isJumping = false;
+        } else {
+            m_state.isGrounded = false;
         }
+    } else {
+        m_state.isGrounded = false;
     }
 
     m_state.lastCollidingTriangleIndex = m_state.collidingTriangleIndex;
+
+    // Debug logging
+    LOG_DEBUG("Player Y velocity: ", m_state.velocity.y);
+    LOG_DEBUG("Is grounded: ", m_state.isGrounded);
+    LOG_DEBUG("Is jumping: ", m_state.isJumping);
+    LOG_DEBUG("Distance to ground: ", distanceToGround);
 }
 
 }  // namespace arena

@@ -5,10 +5,10 @@
 #include "settings.h"
 #include "terrain.h"
 
+#include <memory>
+#include <vector>
 #include "raylib.h"
 #include "raymath.h"
-#include <vector>
-#include <memory>
 
 namespace arena {
 
@@ -29,21 +29,16 @@ struct PlayerState {
     int lastCollidingTriangleIndex = -1;
     int collidingTriangleIndex = -1;
 
-    PlayerState(
-        const Vector3& pos,
-        const Vector3& facing,
-        const float rotation,
-        const float rad,
-        const float inHeight,
-        const float inMoveSpeed,
-        const float inJumpSpeed)
-        : position(pos)
-        , facingDirection(facing)
-        , rotationHorizontal(rotation)
-        , radius(rad)
-        , height(inHeight)
-        , moveSpeed(inMoveSpeed)
-        , jumpSpeed(inJumpSpeed) {}
+    PlayerState(const Vector3& pos, const Vector3& facing, const float rotation,
+                const float rad, const float inHeight, const float inMoveSpeed,
+                const float inJumpSpeed)
+        : position(pos),
+          facingDirection(facing),
+          rotationHorizontal(rotation),
+          radius(rad),
+          height(inHeight),
+          moveSpeed(inMoveSpeed),
+          jumpSpeed(inJumpSpeed) {}
 };
 
 class Player {
@@ -58,13 +53,6 @@ class Player {
     void DrawGroundHeightIndicator() const;
     bool Initialize();
     const PlayerState& GetState() const { return m_state; }
-
-    Vector3 position;
-    Vector3 velocity;
-    Vector3 facing;
-    float rotation;
-    bool isJumping;
-    bool isGrounded;
 
    private:
     void checkCollisions(Vector3& newPosition);
@@ -89,8 +77,6 @@ class Player {
     const float PLAYER_RADIUS = 0.5f;
     const float PLAYER_HEIGHT = 1.0f;
     Terrain* m_terrain;
-
-    
 };
 }  // namespace arena
 #endif  // PLAYER_H
