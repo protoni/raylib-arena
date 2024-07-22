@@ -12,11 +12,12 @@
 
 namespace arena {
 
-struct State {
+struct PlayerState {
 
     Vector3 position;
     Vector3 velocity = {0};
     Vector3 facingDirection;
+    Vector3 movement = {0};
     float rotationHorizontal;
     float radius;
     float height;
@@ -24,8 +25,11 @@ struct State {
     float jumpSpeed;
     bool isGrounded = false;
     bool isJumping = false;
+    float groundHeight = 0;
+    int lastCollidingTriangleIndex = -1;
+    int collidingTriangleIndex = -1;
 
-    State(
+    PlayerState(
         const Vector3& pos,
         const Vector3& facing,
         const float rotation,
@@ -48,8 +52,12 @@ class Player {
     virtual ~Player();
     bool LoadPlayerModel(const char* modelPath);
     void Update(float deltaTime, const std::vector<Vector3>& colliders);
-    void Draw();
+    void Draw() const;
+    void DrawColliders() const;
+    void DrawCollisionBox() const;
+    void DrawGroundHeightIndicator() const;
     bool Initialize();
+    const PlayerState& GetState() const { return m_state; }
 
     Vector3 position;
     Vector3 velocity;
@@ -70,7 +78,7 @@ class Player {
     void updateVelocity(const float delta, const Vector3& relativeMove);
 
     Model m_model;
-    State m_state;
+    PlayerState m_state;
     std::unique_ptr<AnimationManager> m_animManager;
     Settings m_appSettings;
     PlayerSettings m_settings;
@@ -81,6 +89,7 @@ class Player {
     const float PLAYER_RADIUS = 0.5f;
     const float PLAYER_HEIGHT = 1.0f;
     Terrain* m_terrain;
+
     
 };
 }  // namespace arena

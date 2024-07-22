@@ -3,7 +3,8 @@
 
 namespace arena {
 
-ShaderHandler::ShaderHandler(Camera* camera) : m_camera(camera) {}
+ShaderHandler::ShaderHandler(const Settings& settings, Camera* camera)
+    : m_camera(camera), m_settings(settings) {}
 
 ShaderHandler::~ShaderHandler() {
     UnloadShader(m_shader);
@@ -46,15 +47,42 @@ bool ShaderHandler::Load(const char* vertexShaderPath,
     return true;
 }
 
-void ShaderHandler::Begin() {}
+void ShaderHandler::Begin() {
+    BeginShaderMode(m_shader);
+}
 
-void ShaderHandler::End() {}
+void ShaderHandler::End() {
+    EndShaderMode();
+}
 
 void ShaderHandler::Update() {
     Vector3 pos = m_camera->GetPosition();
     float cameraPos[3] = {pos.x, pos.y, pos.z};
     SetShaderValue(m_shader, m_shader.locs[SHADER_LOC_VECTOR_VIEW], cameraPos,
                    SHADER_UNIFORM_VEC3);
+
+    // Update shader values
+    Matrix viewProjection = MatrixMultiply(
+        MatrixLookAt(m_camera->GetCamera().position,
+                     m_camera->GetCamera().target, m_camera->GetCamera().up),
+        MatrixPerspective(m_camera->GetCamera().fovy * DEG2RAD,
+                          (float)m_settings.windowSettings.screenWidth /
+                              (float)m_settings.windowSettings.screenHeight,
+                          0.1f,
+                          1000.0f));
+
+    SetShaderValueMatrix(m_shader, m_shader.locs[SHADER_LOC_MATRIX_MVP],
+                         viewProjection);
+    SetShaderValueMatrix(m_shader, m_shader.locs[SHADER_LOC_MATRIX_MODEL],
+                         MatrixIdentity());
+    SetShaderValueMatrix(m_shader, m_shader.locs[SHADER_LOC_MATRIX_NORMAL],
+                         MatrixTranspose(MatrixInvert(MatrixIdentity())));
+    SetShaderValue(m_shader, m_shader.locs[SHADER_LOC_VECTOR_VIEW],
+                   &m_camera->GetCamera().position.x, SHADER_UNIFORM_VEC3);
+
+    Color diffuseColor = WHITE;
+    SetShaderValue(m_shader, m_shader.locs[SHADER_LOC_COLOR_DIFFUSE], &diffuseColor,
+                   SHADER_UNIFORM_VEC4);
 }
 
 void ShaderHandler::SetCameraPosition(const Vector3& position) {}

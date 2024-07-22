@@ -2,6 +2,7 @@
 #define SHADER_HANDLER_H
 
 #include "camera.h"
+#include "settings.h"
 #include "raylib.h"
 
 namespace arena {
@@ -10,7 +11,7 @@ namespace arena {
 
 class ShaderHandler {
    public:
-    ShaderHandler(Camera* camera);
+    ShaderHandler(const Settings& settings, Camera* camera);
     virtual ~ShaderHandler();
     bool Load(const char* vertexShaderPath, const char* fragmentShaderPath);
     void Begin();
@@ -18,9 +19,10 @@ class ShaderHandler {
     void Update();
     const Shader& GetShader() const { return m_shader; }
     void SetCameraPosition(const Vector3& position);
-    // ... other methods
+
 
    private:
+    Settings m_settings;
     Shader m_shader;
     Camera* m_camera;
 

@@ -1,8 +1,11 @@
 #ifndef LOGGER_H
 #define LOGGER_H
 
+#include <chrono>
 #include <fstream>
+#include <iomanip>
 #include <iostream>
+#include <sstream>
 #include <string>
 
 namespace arena {

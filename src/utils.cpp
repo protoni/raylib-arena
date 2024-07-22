@@ -1,11 +1,10 @@
 #include "utils.h"
 #include "logger.h"
-#include <vector>
 
 namespace arena {
 namespace utils {
 
-static float Clamp(float value, float min, float max) {
+float Clamp(float value, float min, float max) {
     if (value < min)
         return min;
     if (value > max)
@@ -13,8 +12,8 @@ static float Clamp(float value, float min, float max) {
     return value;
 }
 
-static Vector3 BarycentricCoordinates(const Vector3& p, const Vector3& a,
-                                      const Vector3& b, const Vector3& c) {
+Vector3 BarycentricCoordinates(const Vector3& p, const Vector3& a,
+                               const Vector3& b, const Vector3& c) {
     Vector3 v0 = Vector3Subtract(b, a), v1 = Vector3Subtract(c, a),
             v2 = Vector3Subtract(p, a);
     float d00 = Vector3DotProduct(v0, v0);
@@ -29,10 +28,8 @@ static Vector3 BarycentricCoordinates(const Vector3& p, const Vector3& a,
     return Vector3{u, v, w};
 }
 
-static Vector3 Vector3ClosestPointOnTriangle(const Vector3& point,
-                                             const Vector3& v1,
-                                             const Vector3& v2,
-                                             const Vector3& v3) {
+Vector3 Vector3ClosestPointOnTriangle(const Vector3& point, const Vector3& v1,
+                                      const Vector3& v2, const Vector3& v3) {
     Vector3 edge0 = Vector3Subtract(v2, v1);
     Vector3 edge1 = Vector3Subtract(v3, v1);
     Vector3 v0 = Vector3Subtract(v1, point);
@@ -133,8 +130,8 @@ std::vector<Vector3> LoadCollidersFromMesh(const Mesh& mesh) {
     return colliders;
 }
 
-static bool CheckCollisionPointTriangle(const Vector3& point, const Vector3& v1, const Vector3& v2,
-                                 const Vector3& v3) {
+bool CheckCollisionPointTriangle(const Vector3& point, const Vector3& v1,
+                                 const Vector3& v2, const Vector3& v3) {
     // Compute vectors
     Vector3 u = Vector3Subtract(v2, v1);
     Vector3 v = Vector3Subtract(v3, v1);
@@ -156,9 +153,9 @@ static bool CheckCollisionPointTriangle(const Vector3& point, const Vector3& v1,
     return (s >= 0.0f) && (t >= 0.0f) && (s + t <= 1.0f);
 }
 
-static bool CheckCollisionSphereTriangle(const Vector3& center, const float radius, const Vector3& v1,
-                                  const Vector3& v2, const Vector3& v3,
-                                  float& collisionHeight) {
+bool CheckCollisionSphereTriangle(const Vector3& center, const float radius,
+                                  const Vector3& v1, const Vector3& v2,
+                                  const Vector3& v3, float& collisionHeight) {
     // Check if sphere is above the triangle's bounding box
     float minX = fmin(fmin(v1.x, v2.x), v3.x);
     float maxX = fmax(fmax(v1.x, v2.x), v3.x);
@@ -191,4 +188,3 @@ static bool CheckCollisionSphereTriangle(const Vector3& center, const float radi
 
 }  // namespace utils
 }  // namespace arena
-

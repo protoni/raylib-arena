@@ -7,6 +7,12 @@
 
 namespace arena {
 
+struct WindowSettings {
+    const int screenWidth = 800;
+    const int screenHeight = 600;
+    const std::string screenName = "Raylib Arena";
+};
+
 struct CameraSettings {
     float cameraDistance = 5.0f;
     float mouseSensitivity = 150.0f;
@@ -24,10 +30,16 @@ struct PlayerSettings {
     const float initialPlayerHeight = 1.0f;
     const float initialMoveSpeed = 2.0f;
     const float initialJumpSpeed = 5.0f;
+    const float movementThreshold = 0.001f;
+    const float velocityThreshold = 0.001f;
+    const float defaultAnimationSpeed = 50.0f;
 };
 
 struct TerrainSettings {
     const char* model = "../assets/models/map.glb";
+    const float mapWidth = 100.0f;
+    const float mapDepth = 100.0f;
+    const float collisionHysteresis = 0.05f;
 };
 
 struct PhysicsSettings {
@@ -38,7 +50,7 @@ struct PhysicsSettings {
 };
 
 struct Settings {
-
+    WindowSettings windowSettings;
     CameraSettings cameraSettings;
     PlayerSettings playerSettings;
     TerrainSettings terrainSettings;

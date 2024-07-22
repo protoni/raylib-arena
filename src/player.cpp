@@ -1,22 +1,21 @@
 #include "player.h"
-#include "utils.h"
 #include "debug.h"
 #include "logger.h"
+#include "utils.h"
 
 namespace arena {
 
-Player::Player(const Settings& settings, Terrain* terrain) 
-    : 
-    m_appSettings(settings),
-    m_settings(settings.playerSettings),
-    m_terrain(terrain),
-    m_state(
-        settings.playerSettings.initialPlayerPosition,
-        settings.playerSettings.initialPlayerFacingDirection,
-        settings.playerSettings.initialPlayerRotationHorizontal,
-        settings.playerSettings.initialPlayerRadius,
-        settings.playerSettings.initialPlayerHeight) {}
-
+Player::Player(const Settings& settings, Terrain* terrain)
+    : m_appSettings(settings),
+      m_settings(settings.playerSettings),
+      m_terrain(terrain),
+      m_state(settings.playerSettings.initialPlayerPosition,
+              settings.playerSettings.initialPlayerFacingDirection,
+              settings.playerSettings.initialPlayerRotationHorizontal,
+              settings.playerSettings.initialPlayerRadius,
+              settings.playerSettings.initialPlayerHeight,
+              settings.playerSettings.initialMoveSpeed,
+              settings.playerSettings.initialJumpSpeed) {}
 
 Player::~Player() {
     UnloadModel(m_model);
@@ -60,8 +59,8 @@ Vector3 Player::moveToFacingDirection(const float delta,
                                       const Vector3& moveDirection) {
     // Apply movement relative to player's facing direction
     float moveSpeed = 2.0f;
-    Matrix rotationMatrix =
-        MatrixRotateY(-atan2f(m_state.facingDirection.z, m_state.facingDirection.x));
+    Matrix rotationMatrix = MatrixRotateY(
+        -atan2f(m_state.facingDirection.z, m_state.facingDirection.x));
     Vector3 relativeMove = Vector3Transform(moveDirection, rotationMatrix);
 
     // Normalize movement direction
@@ -125,9 +124,8 @@ void Player::Update(float deltaTime, const std::vector<Vector3>& colliders) {
         moveDirection.z -= 1.0f;
     if (IsKeyDown(KEY_D))
         moveDirection.z += 1.0f;
-    
 
-    // Apply movement
+    // Apply direction
     Vector3 relativeMove = moveToFacingDirection(deltaTime, moveDirection);
 
     updateVelocity(deltaTime, relativeMove);
@@ -153,10 +151,86 @@ void Player::Update(float deltaTime, const std::vector<Vector3>& colliders) {
         m_state.isJumping = true;
         m_state.isGrounded = false;
     }
+
+    // Apply movement
+    m_state.movement = Vector3Subtract(newPosition, m_state.position);
+    if (Vector3Length(m_state.movement) > m_settings.movementThreshold) {
+        m_state.position = newPosition;
+    } else if (isGrounded) {
+        // If grounded and movement is small, just update Y
+        m_state.position.y = newPosition.y;
+    }
+
+    // Clamp player position to map boundaries
+    newPosition.x =
+        utils::Clamp(newPosition.x, -m_appSettings.terrainSettings.mapWidth / 2,
+                     m_appSettings.terrainSettings.mapWidth / 2);
+    newPosition.z =
+        utils::Clamp(newPosition.z, -m_appSettings.terrainSettings.mapDepth / 2,
+                     m_appSettings.terrainSettings.mapDepth / 2);
+
+    // Calculate how much the player has moved this frame
+    if (Vector3Length(m_state.movement) > m_settings.movementThreshold) {
+        m_state.position = newPosition;
+    } else {
+        m_state.movement = Vector3Zero();
+    }
+
+    // Ignore very small movements
+    if (fabs(m_state.velocity.y) < m_settings.velocityThreshold) {
+        m_state.velocity.y = 0;
+    }
+
+    // Smooth out small fluctuations in y-position
+    if (fabs(m_state.position.y - m_state.groundHeight - m_state.radius) <
+        0.01f) {
+        m_state.position.y = m_state.groundHeight + m_state.radius;
+    }
+
+    // Print player position for debugging
+    LOG_DEBUG("Player position: ");
+    debug::PrintVec3(m_state.position);
+
+    // Update animations
+    m_animManager->UpdateAnimation(m_model, deltaTime);
 }
 
-void Player::Draw() {
-    // Draw player model and debug visuals
+void Player::Draw() const {
+
+    // Draw player model
+    Vector3 modelPosition = {
+        m_state.position.x,
+        m_state.position.y -
+            m_state.height /
+                2,  // Adjust the model to sit on top of the collision box
+        m_state.position.z};
+    DrawModelEx(m_model, modelPosition, Vector3{0, 1, 0},
+                m_state.rotationHorizontal * RAD2DEG,
+                m_settings.initialPlayerScale, WHITE);
+
+    // Highlight colliding triangle in the terrain
+    m_terrain->DrawCollidingTriangle(m_state.collidingTriangleIndex,
+                                     m_state.position);
+}
+
+void Player::DrawColliders() const {
+    // Draw ground height indicator only when close to the ground
+    if (m_state.position.y - m_state.groundHeight < m_state.height) {
+        Vector3 groundPoint = {m_state.position.x, m_state.groundHeight,
+                               m_state.position.z};
+        DrawSphere(groundPoint, 0.1f, YELLOW);
+    }
+}
+
+void Player::DrawCollisionBox() const {
+    DrawCubeWires(m_state.position, m_state.radius * 2, m_state.height,
+                  m_state.radius * 2, GREEN);
+}
+
+void Player::DrawGroundHeightIndicator() const {
+    Vector3 groundPoint = {m_state.position.x, m_state.groundHeight,
+                           m_state.position.z};
+    DrawSphere(groundPoint, 0.1f, YELLOW);
 }
 
 bool Player::Initialize() {
@@ -164,7 +238,7 @@ bool Player::Initialize() {
         return false;
 
     // Load animations
-    m_animManager = std::make_unique<AnimationManager>();
+    m_animManager = std::make_unique<AnimationManager>(m_settings);
     if (!m_animManager->LoadAnimations(m_settings.model)) {
         LOG_ERROR("Failed to load animations");
         return false;
@@ -175,21 +249,21 @@ bool Player::Initialize() {
 
 void Player::checkCollisions(Vector3& newPosition) {
 
-
-    std::pair<float, int> collisionResult = m_terrain->CheckCollision(
-        newPosition, m_state.radius, m_state.height);
-    float groundHeight = collisionResult.first;
-    int collidingTriangleIndex = collisionResult.second;
+    std::pair<float, int> collisionResult =
+        m_terrain->CheckCollision(newPosition, m_state.radius, m_state.height,
+                                  m_state.lastCollidingTriangleIndex);
+    m_state.groundHeight = collisionResult.first;
+    m_state.collidingTriangleIndex = collisionResult.second;
 
     //bool wasGrounded = isGrounded;
     //m_isGrounded = false;
 
-    if (collidingTriangleIndex != -1) {
-        float feetHeight =
-            newPosition.y - m_state.height / 2;
-        if (feetHeight <= groundHeight + m_appSettings.physicsSettings.collisionGroundCheckDistance) {
-            newPosition.y =
-                groundHeight + m_state.height / 2;
+    if (m_state.collidingTriangleIndex != -1) {
+        float feetHeight = newPosition.y - m_state.height / 2;
+        if (feetHeight <=
+            m_state.groundHeight +
+                m_appSettings.physicsSettings.collisionGroundCheckDistance) {
+            newPosition.y = m_state.groundHeight + m_state.height / 2;
             if (m_state.velocity.y < 0) {
                 m_state.velocity.y = 0;
             }
@@ -197,6 +271,8 @@ void Player::checkCollisions(Vector3& newPosition) {
             m_state.isJumping = false;
         }
     }
+
+    m_state.lastCollidingTriangleIndex = m_state.collidingTriangleIndex;
 }
 
 }  // namespace arena

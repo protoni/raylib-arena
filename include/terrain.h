@@ -1,31 +1,35 @@
 #ifndef TERRAIN_H
 #define TERRAIN_H
 
+#include "settings.h"
 #include <vector>
 #include "raylib.h"
 
 namespace arena {
 
-static const float MAP_WIDTH = 100.0f;
-static const float MAP_DEPTH = 100.0f;
-static const float COLLISION_HYSTERESIS = 0.05f;
 
 class Terrain {
    public:
-    Terrain(const char* modelPath);
+    Terrain(const TerrainSettings& settings);
     virtual ~Terrain();
     bool LoadTerrainModel(const char* modelPath);
     void Draw();
+    void DrawCollidingTriangle(const int triangleIndex,
+                               const Vector3& colliderPosition);
+    void DrawColliderFaces() const;
+    void DrawColliderEdges() const;
     std::pair<float, int> CheckCollision(const Vector3& position, const float radius,
-                                         const float height);
+                                         const float height,
+                                         int& outLastCollidingTriangleIndex);
     bool Initialize();
     const std::vector<Vector3>& GetColliders() const { return m_colliders; }
+    
 
    private:
+    TerrainSettings m_settings;
     Model m_model;
     const char* m_modelPath;
     std::vector<Vector3> m_colliders;
-    int m_lastCollidingTriangleIndex = -1;
 };
 }  // namespace arena
 #endif  // TERRAIN_H

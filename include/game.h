@@ -18,6 +18,8 @@ class Game {
     bool Initialize();
     void Update();
     void Draw();
+    void DrawLights() const;
+    void DrawDebugUi() const;
     void Cleanup();
 
    private:

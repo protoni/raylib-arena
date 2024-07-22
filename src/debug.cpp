@@ -1,7 +1,7 @@
 #include "debug.h"
-#include "utils.h"
-#include "logger.h"
 #include <vector>
+#include "logger.h"
+#include "utils.h"
 
 namespace arena {
 namespace debug {
@@ -29,13 +29,16 @@ void PrintColliderInfo(const Model& model, const int maxColliderCount) {
         utils::LoadCollidersFromMesh(model.meshes[0]);
     if (!colliders.empty()) {
         LOG_DEBUG("Colliders size: ", colliders.size());
-        for (size_t i = 0; i < colliders.size() && i < maxColliderCount;
-             ++i) {
+        for (size_t i = 0; i < colliders.size() && i < maxColliderCount; ++i) {
 
-            LOG_DEBUG("Collider ", i, ":  (", colliders[i].x, ", ",
-                      colliders[i].y, ", ", colliders[i].z, ")");
+            LOG_DEBUG("Collider ", i, ": ");
+            PrintVec3(colliders[i]);
         }
     }
+}
+
+void PrintVec3(const Vector3& vec) {
+    LOG_DEBUG("(", vec.x, ", ", vec.y, ", ", vec.z, ")");
 }
 
 }  // namespace debug

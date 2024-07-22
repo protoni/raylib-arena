@@ -2,7 +2,14 @@
 #include "logger.h"
 #include <iostream>
 
+
 namespace arena {
+AnimationManager::AnimationManager(const PlayerSettings& settings)
+    : m_settings(settings) {}
+
+AnimationManager::~AnimationManager() {
+    Cleanup();
+}
 
 bool AnimationManager::LoadAnimations(const char* filename) {
     int animCount = 0;
@@ -13,19 +20,47 @@ bool AnimationManager::LoadAnimations(const char* filename) {
     } else {
         for (int i = 0; i < animCount; i++) {
             m_animations.push_back({&m_animationData[i], m_animationData[i].name});
+            m_animationSpeedValues.insert(
+                std::make_pair(std::string(m_animationData[i].name),
+                               m_settings.defaultAnimationSpeed));
             LOG_DEBUG("Loaded animation: ", m_animationData[i].name);
         }
     }
 }
 
 void AnimationManager::SetAnimationByName(const std::string& animation) {
-    currentAnimName = animation;
+    m_currentAnimName = animation;
 }
 
-void AnimationManager::UpdateAnimation(Model& model,
-                                       const std::string& animName,
-                                       float& frameCounter, float deltaTime) {
-    // Update current animation
+float AnimationManager::GetAnimationSpeedByName(const std::string& name) const {
+    auto it = m_animationSpeedValues.find(name);
+    if (it != m_animationSpeedValues.end()) {
+        return it->second;
+    }
+
+    return m_settings.defaultAnimationSpeed;
+}
+
+void AnimationManager::UpdateAnimation(Model& model, float deltaTime) {
+    // Update animation
+    int currentAnimIndex =
+        FindAnimationByName(m_currentAnimName.c_str());
+    if (currentAnimIndex == -1) {
+        LOG_ERROR("Animation not found !");
+        currentAnimIndex = 0;  // Use the first animation as a fallback
+    }
+
+    m_animFrameCounter +=
+        deltaTime * GetAnimationSpeedByName(m_currentAnimName);
+    if (currentAnimIndex >= 0 && currentAnimIndex < m_animations.size()) {
+        UpdateModelAnimation(model,
+                             *m_animations[currentAnimIndex].animation,
+                             m_animFrameCounter);
+        if (m_animFrameCounter >=
+            m_animations[currentAnimIndex].animation->frameCount) {
+            m_animFrameCounter = 0;
+        }
+    }
 }
 
 void AnimationManager::Cleanup() {
