@@ -32,7 +32,7 @@ struct PlayerSettings {
     const float initialJumpSpeed = 5.0f;
     const float movementThreshold = 0.001f;
     const float velocityThreshold = 0.001f;
-    const float defaultAnimationSpeed = 50.0f;
+    const float defaultAnimationSpeed = 100.0f;
 };
 
 struct TerrainSettings {

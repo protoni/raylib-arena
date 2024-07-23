@@ -32,14 +32,25 @@ bool Player::LoadPlayerModel(const char* modelPath) {
     return true;
 }
 
-void Player::updateAnimations(const Vector3& direction) const {
-    if (m_state.isJumping || !m_state.isGrounded) {
-        m_animManager->SetAnimationByName("jump_land");
-    } else if (Vector3Length(direction) > 0) {
-        m_animManager->SetAnimationByName("walk");
-    } else {
-        m_animManager->SetAnimationByName("idle");
+void Player::updateAnimations(const Vector3& direction, const float deltaTime) {
+    m_state.animationState = "idle";
+    if (!m_state.isGrounded && m_state.velocity.y > JUMP_VELOCITY_THRESHOLD) {
+        m_state.animationState = "jump_start";
+    } else if (!m_state.isGrounded &&
+               m_state.velocity.y < -JUMP_VELOCITY_THRESHOLD) {
+        m_state.animationState = "jump_land";
+    } else if (Vector3Length(m_state.velocity) > 0.1f) {
+        // Check if moving mostly horizontally relative to terrain
+        Vector3 velocityOnTerrain = Vector3Subtract(
+            m_state.velocity,
+            Vector3Scale(m_terrainNormal,
+                         Vector3DotProduct(m_state.velocity, m_terrainNormal)));
+        if (Vector3Length(velocityOnTerrain) > 0.1f) {
+            m_state.animationState = "walk";
+        }
     }
+
+    m_animManager->UpdateAnimation(m_model, deltaTime, m_state.animationState);
 }
 
 void Player::calculateFacingDirection(const float delta) {
@@ -152,7 +163,7 @@ void Player::Update(float deltaTime, const std::vector<Vector3>& colliders) {
     updateVelocity(deltaTime, relativeMove);
 
     // Change animations
-    updateAnimations(moveDirection);
+    updateAnimations(moveDirection, deltaTime);
 
     // Apply gravity
     const float coyoteTime =
@@ -214,13 +225,17 @@ void Player::Update(float deltaTime, const std::vector<Vector3>& colliders) {
         m_state.position.y = m_state.groundHeight + m_state.radius;
     }
 
+    // Move smoothly over terrain edges
+
+
     // Print player position for debugging
-    LOG_DEBUG("Player position: ");
-    debug::PrintVec3(m_state.position);
+    //LOG_DEBUG("Player position: ");
+    //debug::PrintVec3(m_state.position);
 
     // Update animations
-    m_animManager->UpdateAnimation(m_model, deltaTime);
+    //m_animManager->UpdateAnimation(m_model, deltaTime);
 }
+
 
 void Player::Draw() const {
 
@@ -264,7 +279,6 @@ bool Player::Initialize() {
     if (!LoadPlayerModel(m_settings.model))
         return false;
 
-    // Load animations
     m_animManager = std::make_unique<AnimationManager>(m_settings);
     if (!m_animManager->LoadAnimations(m_settings.model)) {
         LOG_ERROR("Failed to load animations");
@@ -281,14 +295,10 @@ void Player::checkCollisions(Vector3& newPosition) {
     m_state.groundHeight = collisionResult.first;
     m_state.collidingTriangleIndex = collisionResult.second;
 
-    LOG_DEBUG("Ground height: ", m_state.groundHeight);
-    LOG_DEBUG("Colliding triangle index: ", m_state.collidingTriangleIndex);
-
     if (m_state.collidingTriangleIndex != -1) {
         std::vector<int> nearbyTriangles =
             m_terrain->GetNearbyTriangles(newPosition, m_state.radius * 2);
         Vector3 averageNormal = Vector3Zero();
-
         if (!nearbyTriangles.empty()) {
             for (int triangleIndex : nearbyTriangles) {
                 averageNormal = Vector3Add(
@@ -298,20 +308,13 @@ void Player::checkCollisions(Vector3& newPosition) {
                 Vector3Scale(averageNormal, 1.0f / nearbyTriangles.size());
             averageNormal = Vector3Normalize(averageNormal);
         } else {
-            averageNormal = Vector3{
-                0, 1, 0};  // Default to upward normal if no nearby triangles
+            averageNormal = Vector3{0, 1, 0};
         }
 
         float slope = Vector3DotProduct(averageNormal, Vector3{0, 1, 0});
-        float maxClimbableSlope = cosf(DEG2RAD * 45.0f);  // 45 degree max slope
-
+        float maxClimbableSlope = cosf(DEG2RAD * 45.0f);
         float feetHeight = newPosition.y - m_state.height / 2;
         float distanceToGround = feetHeight - m_state.groundHeight;
-
-        LOG_DEBUG("Average normal: (", averageNormal.x, ", ", averageNormal.y,
-                  ", ", averageNormal.z, ")");
-        LOG_DEBUG("Slope: ", slope);
-        LOG_DEBUG("Distance to ground: ", distanceToGround);
 
         const float stepUpHeight = 0.3f;
         const float groundedTolerance = 0.1f;
@@ -321,34 +324,39 @@ void Player::checkCollisions(Vector3& newPosition) {
                 newPosition.y = m_state.groundHeight + m_state.height / 2;
                 if (m_state.velocity.y < 0)
                     m_state.velocity.y = 0;
-                m_state.isGrounded = true;
-                m_state.isJumping = false;
-                m_state.timeSinceGrounded = 0;
+                m_groundedTimer += GetFrameTime();
+                if (m_groundedTimer >= GROUNDED_THRESHOLD) {
+                    m_state.isGrounded = true;
+                    m_state.isJumping = false;
+                }
             } else {
                 Vector3 slopeDirection = Vector3Normalize(
                     Vector3{averageNormal.x, 0, averageNormal.z});
                 float slideSpeed =
                     Vector3Length(m_state.velocity) * (1.0f - slope);
-
                 Vector3 projectedVelocity = Vector3Subtract(
                     m_state.velocity,
                     Vector3Scale(
                         averageNormal,
                         Vector3DotProduct(m_state.velocity, averageNormal)));
-
                 m_state.velocity =
                     Vector3Add(Vector3Scale(slopeDirection, slideSpeed),
                                Vector3Scale(projectedVelocity, slope));
-
                 newPosition.y = m_state.groundHeight + m_state.height / 2 +
                                 groundedTolerance;
+                m_groundedTimer = 0.0f;
                 m_state.isGrounded = false;
             }
         } else {
+            m_groundedTimer = 0.0f;
             m_state.isGrounded = false;
         }
+
+        m_terrainNormal = averageNormal;
     } else {
+        m_groundedTimer = 0.0f;
         m_state.isGrounded = false;
+        m_terrainNormal = Vector3{0, 1, 0};
     }
 
     if (!m_state.isGrounded) {
@@ -358,12 +366,6 @@ void Player::checkCollisions(Vector3& newPosition) {
     }
 
     m_state.lastCollidingTriangleIndex = m_state.collidingTriangleIndex;
-
-    LOG_DEBUG("Final position: (", newPosition.x, ", ", newPosition.y, ", ",
-              newPosition.z, ")");
-    LOG_DEBUG("Final velocity: (", m_state.velocity.x, ", ", m_state.velocity.y,
-              ", ", m_state.velocity.z, ")");
-    LOG_DEBUG("Is grounded: ", m_state.isGrounded);
 }
 
 }  // namespace arena
